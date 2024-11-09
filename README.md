@@ -13,3 +13,7 @@ PATH=$PATH:.
 python3 crawl.py --url http://example.com
 
 
+## Todo:
+
+1. Extract origin functionalities from belonging models
+2. Rework the necessary functions
