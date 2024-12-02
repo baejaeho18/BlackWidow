@@ -166,7 +166,7 @@ def check_edge(driver, graph, edge):
                 graph.data['urls'][purl.path] = 0
             graph.data['urls'][purl.path] += 1
 
-            if graph.data['urls'][purl.path] > 120:
+            if graph.data['urls'][purl.path] > 20:
                 return False
             else:
                 return True
