@@ -14,7 +14,8 @@ import hashlib
 import adblockparser
 import requests
 import csv
-
+import matplotlib.pyplot as plt
+import networkx as nx
 
 from urllib.parse import urlparse, urljoin
 import json
@@ -96,8 +97,10 @@ class Graph:
             self.value = value
             # Meta data for algorithms
             self.visited = False
-            self.depth = depth
+            self.number_of_js = 0
 
+        def update_js_info(self, num):
+            self.number_of_js = num
         def __repr__(self):
             return str(self.value)
         def __eq__(self, other):
@@ -121,7 +124,7 @@ class Graph:
         def __hash__(self):
             return hash( hash(self.n1) + hash(self.n2) + hash(self.value))
         def __repr__(self):
-            return str(self.n1) + " -("+str(self.value)+"["+str(self.visited)+"])-> " + str(self.n2)
+            return " -("+str(self.value)+"["+str(self.visited)+"])-> "
 
     def add(self, value):
         node = self.Node(value)
@@ -188,25 +191,25 @@ class Graph:
         res += "\n---/GRAPH---"
         return res
 
-    # Generates strings that can be pasted into mathematica to draw a graph.
-    def toMathematica(self):
-        cons = [ ('"' + str(edge.n1) + '" -> "' + str(edge.n2) + '"') for edge in self.edges ]
-        data = "{" + ",".join(cons) + "}"
+    # # Generates strings that can be pasted into mathematica to draw a graph.
+    # def toMathematica(self):
+    #     cons = [ ('"' + str(edge.n1) + '" -> "' + str(edge.n2) + '"') for edge in self.edges ]
+    #     data = "{" + ",".join(cons) + "}"
 
-        edge_cons = [ ('("' + str(edge.n1) + '" -> "' + str(edge.n2) + '") -> "' + edge.value.method + "," + str(edge.value.method_data) + '"') for edge in self.edges ]
-        edge_data = "{" + ",".join(edge_cons) + "}"
+    #     edge_cons = [ ('("' + str(edge.n1) + '" -> "' + str(edge.n2) + '") -> "' + edge.value.method + "," + str(edge.value.method_data) + '"') for edge in self.edges ]
+    #     edge_data = "{" + ",".join(edge_cons) + "}"
 
-        vertex_labels = 'VertexLabels -> All'
-        edge_labels =  'EdgeLabels -> ' + edge_data
-        arrow_size = 'EdgeShapeFunction -> GraphElementData["FilledArrow", "ArrowSize" -> 0.005]'
-        vertex_size = 'VertexSize -> 0.1'
-        image_size = 'ImageSize->Scaled[3]'
+    #     vertex_labels = 'VertexLabels -> All'
+    #     edge_labels =  'EdgeLabels -> ' + edge_data
+    #     arrow_size = 'EdgeShapeFunction -> GraphElementData["FilledArrow", "ArrowSize" -> 0.005]'
+    #     vertex_size = 'VertexSize -> 0.1'
+    #     image_size = 'ImageSize->Scaled[3]'
 
-        settings = [vertex_labels, edge_labels, arrow_size, vertex_size, image_size]
+    #     settings = [vertex_labels, edge_labels, arrow_size, vertex_size, image_size]
 
-        res = "Graph["+data+", " + ','.join(settings) + "  ]"
+    #     res = "Graph["+data+", " + ','.join(settings) + "  ]"
 
-        return res
+    #     return res
     
     def edges_from(self, value):
         node = self.Node(value)
@@ -444,38 +447,18 @@ class Crawler:
         # Start url
         self.url = url
         self.graph = Graph()
-
         self.session_id = str(time.time()) + "-" + str(random.randint(1,10000000))
 
-        # Used to track injections. Each injection will have unique key.
-        self.attack_lookup_table = {}
-
-        # input / output graph
-        self.io_graph = {}
-
-        # Optimization to do multiple events in a row without
-        # page reloads.
-        self.events_in_row = 0
-        self.max_events_in_row = 5
-
-        # Start with gets
-        self.early_gets = 0
-        self.max_early_gets = 50
-
-        # Dont attack same form too many times
-        # hash -> number of attacks
-        self.attacked_forms = {}
-
-        # Dont submit same form too many times
-        self.done_form = {}
-        self.max_done_form = 5
+        # Optimization to do multiple events, get and sumbit in a sequence without page reloads.
+        self.max_events = 5
+        self.max_done_form = 1
+        self.max_get = 1
 
         logging.info("Init crawl on " + url)
 
         # Extract JS codes
         self.hash_set = set()
         self.filters = {}
-        self.load_js = 0
         self.max_depth = max_depth
 
     # 1) Start
@@ -487,246 +470,56 @@ class Crawler:
         self.graph.connect(self.root_req, req, CrawlEdge("get", None, None) )
         self.debug_mode = debug_mode
 
-        # Path deconstruction
-        # TODO arg for this
-        if not debug_mode:
-            purl = urlparse(self.url)
-            if purl.path :
-                path_builder = ""
-                for d in purl.path.split("/")[:-1]:
-                    if d:
-                        path_builder += d + "/"
-                        tmp_purl = purl._replace(path=path_builder)
-                        req = Request(tmp_purl.geturl(), "get")
-                        self.graph.add(req)
-                        self.graph.connect(self.root_req, req, CrawlEdge("get", None, None) )
-
-        self.graph.data['urls'] = {}
-        self.graph.data['form_urls'] = {}
-        open("run.flag", "w+").write("1")
-        open("queue.txt", "w+").write("")
-        open("command.txt", "w+").write("")
-
-        random.seed( 6 ) # chosen by fair dice roll
-
-        still_work = True
-        while still_work:
-            print("-"*50)
-            new_edges = len([edge for edge in self.graph.edges if edge.visited == False])
-            print("Edges left: %s" % str(new_edges))
-            try:
-                #f = open("graph.txt", "w")
-                #f.write( self.graph.toMathematica() )
-
-                if "0" in open("run.flag", "r").read():
-                    logging.info("Run set to 0, stop crawling")
-                    break
-                if "2" in open("run.flag", "r").read():
-                    logging.info("Run set to 2, pause crawling")
-                    input("Crawler paused, press enter to continue")
-                    open("run.flag", "w+").write("3")
-
-                n_gets = 0
-                n_forms = 0
-                n_events = 0
-                for edge in self.graph.edges:
-                    if edge.visited == False:
-                        if edge.value.method == "get":
-                            n_gets += 1
-                        elif edge.value.method == "form":
-                            n_forms += 1
-                        elif edge.value.method == "event":
-                            n_events += 1
-                print()
-                print("----------------------")
-                print("GETS    | FROMS  | EVENTS ")
-                print(str(n_gets).ljust(7), "|", str(n_forms).ljust(6), "|", n_events)
-                print("----------------------")
-
-                try:
-                    still_work = self.rec_crawl()
-                except Exception as e:
-                    still_work = n_gets + n_forms + n_events
-                    print(e)
-                    print(traceback.format_exc())
-                    logging.error(e)
-                    logging.error("Top level error while crawling")
-                #input("Enter to continue")
-            except KeyboardInterrupt:
-                print("CTRL-C, abort mission")
-                #print(self.graph.toMathematica())
-                break
-
-        print("Done crawling, ready to attack!")
-        # self.attack()
+        trigger_sequence = [self.graph.create_edge(self.root_req, req, CrawlEdge("get", None, None))]
+        self.rec_crawl(trigger_sequence, 0)
+        print("Done crawling!")
+        self.graph_visualizer()
 
     # 2) Fined Crawl
-    # Handle priority
-    def next_unvisited_edge(self, driver, graph):
-        user_url = open("queue.txt", "r").read()
-        if user_url:
-            print("User supplied url: ", user_url)
-            logging.info("Adding user from URLs " + user_url)
-
-            req = Request(user_url,"get")
-            current_cookies = driver.get_cookies()
-            new_edge = graph.create_edge(self.root_req, req, CrawlEdge(req.method, None, current_cookies), graph.data['prev_edge'] )
-            graph.add(req)
-            graph.connect(self.root_req, req, CrawlEdge(req.method, None, current_cookies), graph.data['prev_edge'] )
-
-            print(new_edge)
-
-            open("queue.txt", "w+").write("")
-            open("run.flag", "w+").write("3")
-
-            successful = follow_edge(driver, graph, new_edge)
-            if successful:
-                return new_edge
-            else:
-                logging.error("Could not load URL from user " + str(new_edge) )
-
-        # Always handle the iframes
-        list_to_use = [edge for edge in graph.edges if edge.value.method == "iframe" and edge.visited == False]
-        if list_to_use:
-            print("Following iframe edge")
-
-        # Start the crawl by focusing more on GETs
-        if not self.debug_mode:
-            if self.early_gets < self.max_early_gets:
-                print("Looking for EARLY gets")
-                print(self.early_gets, "/", self.max_early_gets)
-                list_to_use = [edge for edge in graph.edges if edge.value.method == "get" and edge.visited == False]
-                list_to_use = linkrank(list_to_use, graph.data['urls'])
-                # list_to_use = new_files(list_to_use, graph.data['urls'])
-                # list_to_use = reversed( list_to_use )
-                if list_to_use:
-                    self.early_gets += 1
-                else:
-                    print("No get, trying something else")
-            if self.early_gets == self.max_early_gets:
-                print("RESET")
-                for edge in graph.edges:
-                    graph.unvisit_edge(edge)
-                graph.data['urls'] = {}
-                graph.data['form_urls'] = {}
-                self.early_gets += 1
-
-        if not list_to_use:
-            random_int = random.randint(0,100)
-            if not list_to_use:
-                if random_int >= 0 and random_int < 50:
-                    print("Looking for form")
-                    list_to_use = [edge for edge in graph.edges if edge.value.method == "form" and edge.visited == False]
-                elif random_int >= 50 and random_int < 80:
-                    print("Looking for get")
-                    list_to_use = [edge for edge in graph.edges if edge.value.method == "get" and edge.visited == False]
-                    list_to_use = linkrank(list_to_use, graph.data['urls'])
-                else:
-                    print("Looking for event")
-                    print("--Clicks")
-                    list_to_use = [edge for edge in graph.edges if edge.value.method == "event" and ("click" in edge.value.method_data.event) and edge.visited == False]
-                    if not list_to_use:
-                        print("--No clicks found, check all")
-                        list_to_use = [edge for edge in graph.edges if edge.value.method == "event" and edge.visited == False]
-
-        # Try fallback to GET
-        if not list_to_use:
-            logging.warning("Falling back to GET")
-            list_to_use = [edge for edge in graph.edges if edge.value.method == "get" and edge.visited == False]
-            list_to_use = linkrank(list_to_use, graph.data['urls'])
-
-        # for edge in graph.edges:
-        for edge in list_to_use:
-            if edge.visited == False:
-                if not check_edge(driver, graph, edge):
-                    logging.warning("Check_edge failed for " + str(edge))
-                    edge.visited = True
-                else:
-                    successful = follow_edge(driver, graph, edge)
-                    if successful:
-                        return edge
-
-        # Final fallback to any edge
-        for edge in graph.edges:
-            if edge.visited == False:
-                if not check_edge(driver, graph, edge):
-                    logging.warning("Check_edge failed for " + str(edge))
-                    edge.visited = True
-                else:
-                    successful = follow_edge(driver, graph, edge)
-                    if successful:
-                        return edge
-
-        # Check if we are still in early explore mode
-        if self.early_gets < self.max_early_gets:
-            # Turn off early search
-            self.early_gets = self.max_early_gets
-            return self.next_unvisited_edge(driver, graph)
-
-        return None
-
-    def load_page(self, driver, graph):
-        request = None
-        edge = self.next_unvisited_edge(driver, graph)
-        if not edge:
-            return None
-
-        # Update last visited edge
-        graph.data['prev_edge'] = edge
-
-        request = edge.n2.value
-
-        logging.info("Current url: " + driver.current_url)
-        logging.info("Crawl (edge): " +  str(edge) )
-        print("Crawl (edge): " +  str(edge) )
-
-        return (edge,request)
-  
     # Actually not recursive (TODO change name)
-    def rec_crawl(self, current_edge=None, current_node=None, depth=0, trigger_sequence=None):
+    # def rec_crawl(self, current_edge=None, current_node=None, depth=0, trigger_sequence=None):
+    def rec_crawl(self, trigger_sequence, depth=0, count_get=0, count_forms=0, count_events=0):
 
         if depth > self.max_depth:
             return  # 더 이상 탐색하지 않고 종료
+        if count_get > self.max_get:
+            return
+        if count_forms > self.max_done_form:
+            return
+        if count_events > self.max_events:
+            return
 
         driver = self.driver
         graph = self.graph
+        # if current_node is None:
+        #     todo = self.load_page(driver, graph)
+        #     if not todo:
+        #         print("Done crawling")
+        #         print(graph)
 
-        if current_node is None:
-            todo = self.load_page(driver, graph)
-            if not todo:
-                print("Done crawling")
-                print(graph)
-                pprint.pprint(self.io_graph)
+        #         f = open("graph_mathematica.txt", "w")
+        #         f.write( self.graph.toMathematica() )
 
-                for tracker in self.io_graph:
-                    if self.io_graph[tracker]['reflected']:
-                        print("EDGE FROM ", self.io_graph[tracker]['injected'], "to", self.io_graph[tracker]['reflected'])
+        #         return False
 
-                f = open("graph_mathematica.txt", "w")
-                f.write( self.graph.toMathematica() )
+        #     (edge, request) = todo
+        #     graph.visit_node(request)
+        #     graph.visit_edge(edge)
+        #     current_node = request
+        #     sequence = []
+        # else:
+        if trigger_sequence:
+            edge = trigger_sequence[-1]  # Edge 객체
+            current_node = edge.n2 
+            current_edge = edge.value
+        print("Exploring node: " + " -> ".join([str(edge) for edge in trigger_sequence]) + f" at depth {depth}")
 
-                return False
-
-            (edge, request) = todo
-            graph.visit_node(request)
-            graph.visit_edge(edge)
-            current_node = request
-            sequence = []
-        else:
-            edge = current_edge
-            request = current_node
-            sequence = trigger_sequence.copy()
-        
-        sequence.append(str(current_node))
-        print("Exploring node: " + " -> ".join(sequence) + f" at depth {depth}")
-
-        # (almost) Never GET twice (optimization)
-        if edge.value.method == "get":
-            for e in graph.edges:
-                if (edge.n2 == e.n2) and (edge != e) and (e.value.method == "get"):
-                    #print("Fake visit", e)
-                    graph.visit_edge(e)
-
+        # # (almost) Never GET twice (optimization)
+        # if edge.value.method == "get":
+        #     for e in graph.edges:
+        #         if (edge.n2 == e.n2) and (edge != e) and (e.value.method == "get"):
+        #             #print("Fake visit", e)
+        #             graph.visit_edge(e)
         # Wait if needed
         try:
             wait_json = driver.execute_script("return JSON.stringify(need_to_wait)")
@@ -748,7 +541,6 @@ class Crawler:
                 logging.warning("Inner wait error for need_to_wait")
         except:
             logging.warning("No need_to_wait")
-
         # Timeouts
         try:
             resps = driver.execute_script("return JSON.stringify(timeouts)")
@@ -762,18 +554,7 @@ class Crawler:
         except:
             logging.warning("No timeouts from stringify")
 
-        early_state = self.early_gets < self.max_early_gets
-        login_form = find_login_form(driver, graph, early_state)
-
-        if login_form:
-            logging.info("Found login form")
-            print("We want to test edge: ", edge)
-            new_form = set_form_values(set([login_form])).pop()
-            try:
-                print("Logging in")
-                form_fill(driver, new_form)
-            except:
-                logging.warning("Failed to login to potiential login form")
+        self.extract_JS(trigger_sequence)
 
         # Extract urls, forms, elements, iframe etc
         reqs = extract_urls(driver)
@@ -801,10 +582,12 @@ class Crawler:
         logging.info("Adding requests from URLs")
         for req in reqs:
             logging.info("from URLs %s " % str(req))
-            new_edge = graph.create_edge(request, req, CrawlEdge(req.method, None, current_cookies), edge )
+            new_edge = graph.create_edge(current_node, req, CrawlEdge(req.method, None, current_cookies), current_edge )
             if allow_edge(graph, new_edge):
+                new_sequence = trigger_sequence + [(new_edge)]
+                self.rec_crawl(new_sequence, depth + 1, count_get + 1, count_forms, count_events)
                 graph.add(req)
-                graph.connect(request, req, CrawlEdge(req.method, None, current_cookies), edge )
+                graph.connect(current_node, req, CrawlEdge(req.method, None, current_cookies), current_edge )
             else:
                 logging.info("Not allowed to add edge: %s" % new_edge)
 
@@ -812,22 +595,26 @@ class Crawler:
         for form in forms:
             req = Request(form.action, form.method)
             logging.info("from forms %s " % str(req))
-            new_edge = graph.create_edge( request, req, CrawlEdge("form", form, current_cookies), edge )
+            new_edge = graph.create_edge( current_node, req, CrawlEdge("form", form, current_cookies), current_edge )
             if allow_edge(graph, new_edge):
+                new_sequence = trigger_sequence + [(new_edge)]
+                self.rec_crawl(new_sequence, depth + 1, count_get, count_forms + 1, count_events)
                 graph.add(req)
-                graph.connect(request, req, CrawlEdge("form", form, current_cookies), edge )
+                graph.connect(current_node, req, CrawlEdge("form", form, current_cookies), current_edge )
             else:
                 logging.info("Not allowed to add edge: %s" % new_edge)
 
         logging.info("Adding requests from events")
         for event in events:
-            req = Request(request.url, "event")
+            req = Request(current_node.url, "event")
             logging.info("from events %s " % str(req))
 
-            new_edge = graph.create_edge( request, req, CrawlEdge("event", event, current_cookies), edge )
+            new_edge = graph.create_edge( current_node, req, CrawlEdge("event", event, current_cookies), current_edge )
             if allow_edge(graph, new_edge):
+                new_sequence = trigger_sequence + [(new_edge)]
+                self.rec_crawl(new_sequence, depth + 1, count_get, count_forms, count_events + 1)
                 graph.add(req)
-                graph.connect(request, req, CrawlEdge("event", event, current_cookies), edge )
+                graph.connect(current_node, req, CrawlEdge("event", event, current_cookies), current_edge )
             else:
                 logging.info("Not allowed to add edge: %s" % new_edge)
 
@@ -836,10 +623,12 @@ class Crawler:
             req = Request(iframe.src, "iframe")
             logging.info("from iframes %s " % str(req))
 
-            new_edge = graph.create_edge( request, req, CrawlEdge("iframe", iframe, current_cookies), edge )
+            new_edge = graph.create_edge( current_node, req, CrawlEdge("iframe", iframe, current_cookies), current_edge )
             if allow_edge(graph, new_edge):
+                new_sequence = trigger_sequence + [(new_edge)]
+                self.rec_crawl(new_sequence, depth + 1)
                 graph.add(req)
-                graph.connect(request, req, CrawlEdge("iframe", iframe, current_cookies), edge )
+                graph.connect(current_node, req, CrawlEdge("iframe", iframe, current_cookies), current_edge )
             else:
                 logging.info("Not allowed to add edge: %s" % new_edge)
 
@@ -848,10 +637,12 @@ class Crawler:
             req = Request(driver.current_url, "ui_form")
             logging.info("from ui_forms %s " % str(req))
 
-            new_edge = graph.create_edge( request, req, CrawlEdge("ui_form", ui_form, current_cookies), edge )
+            new_edge = graph.create_edge( current_node, req, CrawlEdge("ui_form", ui_form, current_cookies), current_edge )
             if allow_edge(graph, new_edge):
+                new_sequence = trigger_sequence + [(new_edge)]
+                self.rec_crawl(new_sequence, depth + 1, count_get, count_forms + 1, count_events)
                 graph.add(req)
-                graph.connect(request, req, CrawlEdge("ui_form", ui_form, current_cookies), edge )
+                graph.connect(current_node, req, CrawlEdge("ui_form", ui_form, current_cookies), current_edge )
             else:
                 logging.info("Not allowed to add edge: %s" % new_edge)
 
@@ -862,15 +653,9 @@ class Crawler:
         except NoAlertPresentException:
             pass
 
-        # Check for successful attacks
-        # time.sleep(0.1)
-        # self.inspect_attack(edge)
-        # self.inspect_tracker(edge)
-
         if "3" in open("run.flag", "r").read():
             logging.info("Run set to 3, pause each step")
             input("Crawler in stepping mode, press enter to continue. EDIT run.flag to run")
-
         # Check command
         found_command = False
         if "get_graph" in open("command.txt", "r").read():
@@ -882,13 +667,12 @@ class Crawler:
         if found_command:
             open("command.txt", "w+").write("")
 
-        self.extract_JS(sequence)
-        for edge in graph.edges_from(current_node):
-            next_node = edge.n2.value
-            if not graph.visit_node(next_node):
-                logging.info(f"Recursively visiting: {next_node}")
-            self.rec_crawl(new_edge, next_node, depth + 1, sequence)
-        logging.info(f"Returning from node: {current_node} at depth {depth}")
+        # for edge in graph.edges_from(current_node):
+        #     next_node = edge.n2.value
+        #     if not graph.visit_node(next_node):
+        #         logging.info(f"Recursively visiting: {next_node}")
+        #     self.rec_crawl(new_edge, next_node, depth + 1, sequence)
+        # logging.info(f"Returning from node: {current_node} at depth {depth}")
 
         return True
 
@@ -920,20 +704,37 @@ class Crawler:
         self.filters = filter_lists
 
     def is_tracker(self, script_url):
-        count = sum(self.filters[name].should_block(script_url) for name in self.filters)
-        if count >= 2:
-            return True
-        return False
+        checked_filters = []
+        for name, filter_obj in self.filters.items():
+            if filter_obj.should_block(script_url):
+                checked_filters.append(name)
+        return len(checked_filters) >= 2, checked_filters
+        # count = sum(self.filters[name].should_block(script_url) for name in self.filters)
+        # if count >= 2:
+        #     return True
+        # return False
 
-    def save_to_csv(self, csv_file_path, root_url, file_name, hash, trigger_sequence, label):
-        if not os.path.exists(csv_file_path):
-            with open(csv_file_path, mode="w", encoding="utf-8", newline="") as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(["Root URL", "File Name", "Hashcode", "Trigger Sequence", "Label"])
-
-        with open(csv_file_path, mode="a", encoding="utf-8", newline="") as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow([root_url, file_name, hash, " -> ".join(trigger_sequence), label])
+    def save_to_excel(self, excel_file_path, root_url, trigger_sequence, script_url, content_hash, label, checked_filter):
+        from openpyxl import Workbook, load_workbook
+        
+        if not os.path.exists(excel_file_path):
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "JavaScript Logs"
+            ws.append(["Root URL", "Trigger Sequence", "Script URL", "Content Hash", "Label", "Checked Filter"])
+            wb.save(excel_file_path)
+        
+        wb = load_workbook(excel_file_path)
+        ws = wb.active
+        ws.append([
+            root_url,
+            " -> ".join([f"{node1} -( {edge} )-> " for node1, _, edge, _ in trigger_sequence] + [trigger_sequence[-1][1]]),
+            script_url,
+            content_hash,
+            label,
+            ", ".join(checked_filter) if isinstance(checked_filter, list) else checked_filter
+        ])
+        wb.save(excel_file_path)
 
     def save_file(self, file_path, content):
         with open(file_path, 'a', encoding='utf-8') as f:
@@ -943,6 +744,28 @@ class Crawler:
         OUTPUT_DIR = "./js_output"
         driver = self.driver
         soup = BeautifulSoup(driver.page_source, 'html.parser')
+        load_js = 0
+
+        # inline의 경우 labeling을 일단 pass한다.
+        inline_js = [tag.text for tag in soup.find_all('script') if tag.text.strip()]
+        for script in inline_js:
+            content_hash = self.hash_content(script)
+            if content_hash not in self.hash_set:
+                load_js += 1
+                self.hash_set.add(content_hash)
+                os.makedirs((os.path.join(OUTPUT_DIR, content_hash))) 
+                self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "code"), script)
+                self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "Inline")
+                # self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, f"url_{self.load_js}.js", content_hash, trigger_sequence, "0")
+                self.save_to_excel(
+                    os.path.join(self.output_dir, "script_logs.xlsx"),
+                    self.start_node,
+                    trigger_sequence,
+                    f"url_{load_js}.js",
+                    content_hash,
+                    "Inline",
+                    "N/A"
+                )
 
         external_js_urls = [tag['src'] for tag in soup.find_all('script', src=True)]
         for script_url in external_js_urls:
@@ -960,27 +783,54 @@ class Crawler:
 
             content_hash = self.hash_content(script_content)
             if content_hash not in self.hash_set:
+                load_js += 1
                 self.hash_set.add(content_hash)
                 os.makedirs((os.path.join(OUTPUT_DIR, content_hash)))
                 self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "code"), script_content)
-                if self.is_tracker(script_url):
-                    self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "1")
-                    self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "1")
-                else:
-                    self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "0")
-                    self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "0")
+                # if self.is_tracker(script_url):
+                #     self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "1")
+                #     self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "1")
+                # else:
+                #     self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "0")
+                #     self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "0")
+                is_tracking, checked_filters = self.is_tracker(script_url)
+                label = "1" if is_tracking else "0"
+                self.save_file(os.path.join(OUTPUT_DIR, content_hash, "label"), label)
+                self.save_to_csv(
+                    os.path.join(OUTPUT_DIR, "script_logs.csv"),
+                    driver.current_url, full_script_url, content_hash,
+                    trigger_sequence, label, checked_filters if is_tracking else []
+                )
+        trigger_sequence[-1].n2.update_js_info(load_js)
 
-        # inline의 경우 labeling을 어떻게 하는거지? 그냥 정상코드로 인식해야하나..?
-        inline_js = [tag.text for tag in soup.find_all('script') if tag.text.strip()]
-        for script in inline_js:
-            content_hash = self.hash_content(script)
-            if content_hash not in self.hash_set:
-                self.hash_set.add(content_hash)
-                os.makedirs((os.path.join(OUTPUT_DIR, content_hash))) 
-                self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "code"), script)
-                self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "0")
-                self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, f"url_{self.load_js}.js", content_hash, trigger_sequence, "0")
-                self.load_js += 1
+    # 4) Graph Representation
+    def graph_visualizer(self):
+        # NetworkX 그래프 객체 생성
+        G = nx.DiGraph()  # 방향성이 있는 그래프 (일반적으로 웹 크롤링에서는 방향성이 중요)
+
+        # 그래프에 노드 추가
+        for node in self.graph.nodes:
+            G.add_node(node.value)  # Node의 value를 사용하여 노드를 추가
+
+        # 그래프에 엣지 추가
+        for edge in self.graph.edges:
+            G.add_edge(edge.n1.value, edge.n2.value, method=edge.value)
+
+        # 그래프의 레이아웃을 설정
+        pos = nx.spring_layout(G)  # spring_layout은 노드 간의 거리를 자연스럽게 배치해줍니다.
+
+        # 노드와 엣지를 시각화
+        plt.figure(figsize=(12, 12))  # 그래프의 크기를 설정
+        nx.draw(G, pos, with_labels=True, node_size=3000, node_color='lightblue', font_size=10, font_weight='bold', edge_color='gray')
+
+        # 엣지의 레이블 (요청 메서드 표시)
+        edge_labels = nx.get_edge_attributes(G, 'method')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+
+        # 그래프 표시
+        plt.title("Graph Visualization")
+        plt.show()
+
 
 
 # Edge with specific crawling info, cookies, type of request etc.
