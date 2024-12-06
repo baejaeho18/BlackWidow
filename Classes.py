@@ -93,7 +93,7 @@ class Graph:
 
     # Separate node class for storing meta data.
     class Node:
-        def __init__(self, value, depth=0):
+        def __init__(self, value):
             self.value = value
             # Meta data for algorithms
             self.visited = False
@@ -470,6 +470,8 @@ class Crawler:
         self.graph.connect(self.root_req, req, CrawlEdge("get", None, None) )
         self.debug_mode = debug_mode
 
+        time.sleep(30)
+
         trigger_sequence = [self.graph.create_edge(self.root_req, req, CrawlEdge("get", None, None))]
         self.rec_crawl(trigger_sequence, 0)
         print("Done crawling!")
@@ -477,7 +479,6 @@ class Crawler:
 
     # 2) Fined Crawl
     # Actually not recursive (TODO change name)
-    # def rec_crawl(self, current_edge=None, current_node=None, depth=0, trigger_sequence=None):
     def rec_crawl(self, trigger_sequence, depth=0, count_get=0, count_forms=0, count_events=0):
 
         if depth > self.max_depth:
@@ -491,27 +492,27 @@ class Crawler:
 
         driver = self.driver
         graph = self.graph
-        # if current_node is None:
-        #     todo = self.load_page(driver, graph)
-        #     if not todo:
-        #         print("Done crawling")
-        #         print(graph)
-
-        #         f = open("graph_mathematica.txt", "w")
-        #         f.write( self.graph.toMathematica() )
-
-        #         return False
-
-        #     (edge, request) = todo
-        #     graph.visit_node(request)
-        #     graph.visit_edge(edge)
-        #     current_node = request
-        #     sequence = []
-        # else:
         if trigger_sequence:
             edge = trigger_sequence[-1]  # Edge 객체
             current_node = edge.n2 
             current_edge = edge.value
+        #     graph.visit_edge(current_edge)
+        # print("-"*50)
+        # new_edges = len([edge for edge in self.graph.edges if edge.visited == False])
+        # print("Edges left: %s" % str(new_edges))
+        # for edge in self.graph.edges:
+        #     if edge.visited == False:
+        #         if edge.value.method == "get":
+        #             n_gets += 1
+        #         elif edge.value.method == "form":
+        #             n_forms += 1
+        #         elif edge.value.method == "event":
+        #             n_events += 1
+        # print()
+        # print("----------------------")
+        # print("GETS    | FROMS  | EVENTS ")
+        # print(str(n_gets).ljust(7), "|", str(n_forms).ljust(6), "|", n_events)
+        # print("----------------------")
         print("Exploring node: " + " -> ".join([str(edge) for edge in trigger_sequence]) + f" at depth {depth}")
 
         # # (almost) Never GET twice (optimization)
@@ -530,7 +531,6 @@ class Crawler:
             logging.warning("Alert detected")
             alert = driver.switch_to_alert()
             alert.dismiss()
-
             # Check if double check is needed...
             try:
                 wait_json = driver.execute_script("return JSON.stringify(need_to_wait)")
