@@ -721,7 +721,7 @@ class Crawler:
             wb = Workbook()
             ws = wb.active
             ws.title = "JavaScript Logs"
-            ws.append(["Root URL", "Trigger Sequence", "Script URL", "Content Hash", "Label", "Checked Filter"])
+            ws.append(["Root URL", "Trigger Sequence", "Depth", "Script URL", "Content Hash", "Label", "Checked Filter"])
             wb.save(excel_file_path)
         
         wb = load_workbook(excel_file_path)
@@ -729,6 +729,7 @@ class Crawler:
         ws.append([
             root_url,
             " -> ".join([f"{node1} -( {edge} )-> " for node1, _, edge, _ in trigger_sequence] + [trigger_sequence[-1][1]]),
+            len(trigger_sequence),
             script_url,
             content_hash,
             label,
@@ -740,11 +741,19 @@ class Crawler:
         with open(file_path, 'a', encoding='utf-8') as f:
             f.write(content)
 
-    def extract_JS(self, trigger_sequence):
+    def extract_JS(self, edge):
         OUTPUT_DIR = "./js_output"
         driver = self.driver
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         load_js = 0
+
+        # 시퀀스 생성: parent를 따라 올라가며 시퀀스 구성
+        trigger_sequence = []
+        current_edge = edge
+        while current_edge is not None:
+            trigger_sequence.append(current_edge)
+            current_edge = current_edge.parent
+        trigger_sequence = trigger_sequence[::-1]  # 시퀀스를 올바른 순서로 정렬
 
         # inline의 경우 labeling을 일단 pass한다.
         inline_js = [tag.text for tag in soup.find_all('script') if tag.text.strip()]
