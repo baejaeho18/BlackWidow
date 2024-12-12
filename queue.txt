@@ -1,0 +1,10 @@
+https://google.com
+https://amazonaws.com
+https://microsoft.com
+https://facebook.com
+https://akamai.net
+https://apple.com
+https://root-servers.net
+https://a-msedge.net
+https://youtube.com
+https://googleapis.com

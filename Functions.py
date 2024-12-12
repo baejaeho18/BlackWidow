@@ -41,6 +41,7 @@ def send(driver, cmd, params={}):
 def add_script(driver, script):
   send(driver, "Page.addScriptToEvaluateOnNewDocument", {"source": script})
 
+
 # Changes the address from the row to the first cell
 # Only modifies if it is a table row
 # In:  /html/body/table/tbody/tr[4]
@@ -62,6 +63,8 @@ def remove_alerts(driver):
         alert.dismiss()
     except NoAlertPresentException:
         pass
+
+
 
 def depth(edge):
     depth = 1
@@ -132,6 +135,7 @@ def find_state(driver, graph, edge):
 
     return True
 
+
 # Recursively follows parent until a stable node is found.
 # Stable in this case would be defined as a GET
 def rec_find_path(graph, edge):
@@ -145,11 +149,13 @@ def rec_find_path(graph, edge):
     else:
         return rec_find_path(graph, parent) + [edge]
 
+
 def edge_sort(edge):
     if edge.value[0] == "form":
         return 0
     else:
         return 1
+
 
 # Check if we should follow edge
 # Could be based on SOP, number of reqs, etc.
@@ -166,7 +172,7 @@ def check_edge(driver, graph, edge):
                 graph.data['urls'][purl.path] = 0
             graph.data['urls'][purl.path] += 1
 
-            if graph.data['urls'][purl.path] > 20:
+            if graph.data['urls'][purl.path] > 120:
                 return False
             else:
                 return True
@@ -179,19 +185,22 @@ def check_edge(driver, graph, edge):
             graph.data['form_urls'][purl.path] = 0
         graph.data['form_urls'][purl.path] += 1
 
-        if graph.data['form_urls'][purl.path] > 5:
+        if graph.data['form_urls'][purl.path] > 10:
             logging.info("FROM ACTION URL (path) %s, visited more than 10 times, mark as done" % str(edge.n2.value.url))
             return False
         else:
             return True
     elif method == "event":
-        if dom_depth(edge) > 5:
+        if dom_depth(edge) > 10:
             logging.info("Dom depth (10) reached! Discard edge %s " % ( str(edge) ) )
             return False
         else:
             return True
     else:
         return True
+
+
+
 
 def follow_edge(driver, graph, edge):
 
@@ -235,6 +244,9 @@ def follow_edge(driver, graph, edge):
 
     # Success
     return True
+
+
+
 
 # Checks if two URLs target the same origin
 def same_origin(u1, u2):
@@ -295,6 +307,11 @@ def allow_edge(graph, edge):
     else:
         logging.debug("Different origins %s and %s" % (str(from_url), str(to_url)))
         return False
+
+
+
+
+
 
 def execute_event(driver, do):
     logging.info("We need to trigger [" +  do.event + "] on " + do.addr)
@@ -373,6 +390,10 @@ def execute_event(driver, do):
         print("Error", do)
         print(e)
 
+
+
+
+
 def form_fill_file(filename):
     dirname = os.path.dirname(__file__)
     path = os.path.join(dirname, 'form_files', filename)
@@ -385,6 +406,8 @@ def form_fill_file(filename):
         dynamic_file.close()
 
     return path
+
+
 
 # The problem is that equality does not cover both cases
 # Different values => Different Edges           (__eq__)
@@ -449,6 +472,8 @@ def form_fill(driver, target_form):
                         web_el = driver.find_element_by_xpath(js_el['xpath'])
                         inputs.append(web_el)
                     break
+
+
 
         buttons = el.find_elements_by_tag_name("button")
         inputs.extend(buttons)
@@ -575,6 +600,8 @@ def form_fill(driver, target_form):
             else:
                 logging.warning("[selects] could NOT FIND " + str(form_select) )
 
+
+
         # <textarea>
         textareas = el.find_elements_by_tag_name("textarea")
         for ta in textareas:
@@ -609,7 +636,10 @@ def form_fill(driver, target_form):
                         iframe_body.send_keys(i.value)
                     else:
                         logging.error("Body not contenteditable, was during parse")
+
                     driver.switch_to.default_content();
+
+
                 except InvalidElementStateException as e:
                     logging.error("Could not clear " + str(form_ta))
                     logging.error(e)
@@ -638,6 +668,7 @@ def form_fill(driver, target_form):
                             el.submit()
                         except Exception as e:
                             logging.info("Could not submit form, could be good!")
+
                     except Exception as e:
                         logging.warning("Cannot click on submit button: " + str(submit_button) + str(target_form))
                         logging.info("form_fill Javascript submission of form after failed submit button click")
@@ -656,6 +687,7 @@ def form_fill(driver, target_form):
             logging.info("form_fill Javascript submission of form")
             el.submit()
 
+
         # Check if submission caused an "are you sure" alert
         try:
             alert = driver.switch_to_alert()
@@ -671,6 +703,7 @@ def form_fill(driver, target_form):
     logging.error("error no form found (url:%s, form:%s)" % (driver.current_url, target_form) )
     return False
     #raise Exception("error no form found (url:%s, form:%s)" % (driver.current_url, target_form) )
+
 
 def ui_form_fill(driver, target_form):
     logging.debug("Filling ui_form "+ str(target_form))
@@ -814,6 +847,7 @@ def set_form_values(forms):
 
     return new_forms
 
+
 def enter_iframe(driver, target_frame):
     elem = driver.find_elements_by_tag_name("iframe")
     elem.extend( driver.find_elements_by_tag_name("frame") )
@@ -855,6 +889,7 @@ def find_login_form(driver, graph, early_state=False):
                 logging.info("NEED TO LOGIN FOR FORM: " + str(form))
                 return form
 
+
 def linkrank(link_edges, visited_list):
     tups = []
     for edge in link_edges:
@@ -891,6 +926,7 @@ def new_files(link_edges, visited_list):
     input("OK tups?")
 
     return [edge for (edge, _) in tups]
+
 
 # Returns None if the string is empty, otherwise just the string
 def empty2none(s):
