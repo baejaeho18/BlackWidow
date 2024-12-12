@@ -1,3 +1,7 @@
 tldextract
 selenium==3.141.0
 urllib3==1.26.15
+beautifulsoup4
+adblockparser
+matplotlib
+networkx
