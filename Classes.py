@@ -467,8 +467,8 @@ class Crawler:
 
         logging.info("Init crawl on " + url)
 
-        self.max_depth = 2
-        self.max_events = 1
+        self.max_depth = 4
+        self.max_events = 3
         self.max_forms = 1
         self.max_gets = 1
 
@@ -503,9 +503,6 @@ class Crawler:
 
         self.graph.data['urls'] = {}
         self.graph.data['form_urls'] = {}
-        # open("run.flag", "w+").write("1")
-        # open("queue.txt", "w+").write("")
-        # open("command.txt", "w+").write("")
 
         random.seed( 6 ) # chosen by fair dice roll
 
@@ -518,17 +515,6 @@ class Crawler:
             new_edges = len([edge for edge in self.graph.edges if edge.visited == False])
             print("Edges left: %s | Processed: %s" % (new_edges, processed_edges_count))  # 처리된 Edge 출력
             try:
-                #f = open("graph.txt", "w")
-                #f.write( self.graph.toMathematica() )
-
-                # if "0" in open("run.flag", "r").read():
-                #     logging.info("Run set to 0, stop crawling")
-                #     break
-                # if "2" in open("run.flag", "r").read():
-                #     logging.info("Run set to 2, pause crawling")
-                #     input("Crawler paused, press enter to continue")
-                #     open("run.flag", "w+").write("3")
-
                 n_gets = 0
                 n_forms = 0
                 n_events = 0
@@ -572,78 +558,6 @@ class Crawler:
 
     # Handle priority
     def next_unvisited_edge(self, driver, graph):
-        # user_url = open("queue.txt", "r").read()
-        # if user_url:
-        #     print("User supplied url: ", user_url)
-        #     logging.info("Adding user from URLs " + user_url)
-
-        #     req = Request(user_url,"get")
-        #     current_cookies = driver.get_cookies()
-        #     new_edge = graph.create_edge(self.root_req, req, CrawlEdge(req.method, None, current_cookies), graph.data['prev_edge'] )
-        #     graph.add(req)
-        #     graph.connect(self.root_req, req, CrawlEdge(req.method, None, current_cookies), graph.data['prev_edge'] )
-
-        #     print(new_edge)
-
-        #     open("queue.txt", "w+").write("")
-        #     open("run.flag", "w+").write("3")
-
-        #     successful = follow_edge(driver, graph, new_edge)
-        #     if successful:
-        #         return new_edge
-        #     else:
-        #         logging.error("Could not load URL from user " + str(new_edge) )
-
-        # # Always handle the iframes
-        # list_to_use = [edge for edge in graph.edges if edge.value.method == "iframe" and edge.visited == False]
-        # if list_to_use:
-        #     print("Following iframe edge")
-
-        # if not list_to_use:
-        #     random_int = random.randint(0,100)
-        #     if not list_to_use:
-        #         if random_int >= 0 and random_int < 20:
-        #             print("Looking for form")
-        #             list_to_use = [edge for edge in graph.edges if edge.value.method == "form" and edge.visited == False]
-        #         elif random_int >= 20 and random_int < 50:
-        #             print("Looking for get")
-        #             list_to_use = [edge for edge in graph.edges if edge.value.method == "get" and edge.visited == False]
-        #             list_to_use = linkrank(list_to_use, graph.data['urls'])
-        #         else:
-        #             print("Looking for event")
-        #             print("--Clicks")
-        #             list_to_use = [edge for edge in graph.edges if edge.value.method == "event" and ("click" in edge.value.method_data.event) and edge.visited == False]
-        #             if not list_to_use:
-        #                 print("--No clicks found, check all")
-        #                 list_to_use = [edge for edge in graph.edges if edge.value.method == "event" and edge.visited == False]
-
-        # # Try fallback to GET
-        # if not list_to_use:
-        #     logging.warning("Falling back to GET")
-        #     list_to_use = [edge for edge in graph.edges if edge.value.method == "get" and edge.visited == False]
-        #     list_to_use = linkrank(list_to_use, graph.data['urls'])
-
-        # #for edge in graph.edges:
-        # for edge in list_to_use:
-        #     if edge.visited == False:
-        #         if not check_edge(driver, graph, edge):
-        #             logging.warning("Check_edge failed for " + str(edge))
-        #             edge.visited = True
-        #         else:
-        #             successful = follow_edge(driver, graph, edge)
-        #             if successful:
-        #                 return edge
-
-        # # Final fallback to any edge
-        # for edge in graph.edges:
-        #     if edge.visited == False:
-        #         if not check_edge(driver, graph, edge):
-        #             logging.warning("Check_edge failed for " + str(edge))
-        #             edge.visited = True
-        #         else:
-        #             successful = follow_edge(driver, graph, edge)
-        #             if successful:
-        #                 return edge
         for edge in graph.edges:
             if not edge.visited:
                 if check_edge(driver, graph, edge) and follow_edge(driver, graph, edge):
@@ -829,21 +743,6 @@ class Crawler:
         except NoAlertPresentException:
             pass
 
-        # if "3" in open("run.flag", "r").read():
-        #     logging.info("Run set to 3, pause each step")
-        #     input("Crawler in stepping mode, press enter to continue. EDIT run.flag to run")
-
-        # # Check command
-        # found_command = False
-        # if "get_graph" in open("command.txt", "r").read():
-        #     f = open("graph.txt", "w+")
-        #     f.write(str(self.graph))
-        #     f.close()
-        #     found_command = True
-        # # Clear commad
-        # if found_command:
-        #     open("command.txt", "w+").write("")
-
         return True
 
     # 3) Extract JS
@@ -878,11 +777,7 @@ class Crawler:
         for name, filter_obj in self.filters.items():
             if filter_obj.should_block(script_url):
                 checked_filters.append(name)
-        return len(checked_filters) >= 2, checked_filters
-        # count = sum(self.filters[name].should_block(script_url) for name in self.filters)
-        # if count >= 2:
-        #     return True
-        # return False
+        return len(checked_filters) > 0, checked_filters
 
     def save_to_excel(self, excel_file_path, root_url, trigger_sequence, script_url, content_hash, label, checked_filter):
         from openpyxl import Workbook, load_workbook
@@ -911,6 +806,99 @@ class Crawler:
         with open(file_path, 'a', encoding='utf-8') as f:
             f.write(content)
 
+    # def extract_JS(self, edge):
+    #     OUTPUT_DIR = "./js_output"
+    #     driver = self.driver
+    #     soup = BeautifulSoup(driver.page_source, 'html.parser')
+    #     load_js = 0
+
+    #     # 시퀀스 생성: parent를 따라 올라가며 시퀀스 구성
+    #     trigger_sequence = []
+    #     current_edge = edge
+    #     while current_edge is not None:
+    #         trigger_sequence.append(current_edge)
+    #         current_edge = current_edge.parent
+    #     trigger_sequence = trigger_sequence[::-1]  # 시퀀스를 올바른 순서로 정렬
+
+    #     # inline의 경우 labeling을 일단 pass한다.
+    #     inline_js = [tag.text for tag in soup.find_all('script') if tag.text.strip()]
+    #     for script in inline_js:
+    #         content_hash = self.hash_content(script)
+    #         script_dir = os.path.join(OUTPUT_DIR, content_hash)
+    #         if not os.path.exists(script_dir):
+    #         # if content_hash not in self.hash_set:
+    #             load_js += 1
+    #             # self.hash_set.add(content_hash)
+    #             os.makedirs(script_dir) 
+    #             self.save_file(os.path.join(script_dir, "code"), script)
+    #             self.save_file(os.path.join(script_dir, "label"), "Inline")
+    #             # self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, f"url_{self.load_js}.js", content_hash, trigger_sequence, "0")
+    #             self.save_to_excel(
+    #                 os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
+    #                 self.url,
+    #                 trigger_sequence,
+    #                 f"url_{load_js}.js",
+    #                 content_hash,
+    #                 "Inline",
+    #                 []
+    #             )
+
+    #     external_js_urls = [tag['src'] for tag in soup.find_all('script', src=True)]
+    #     for script_url in external_js_urls:
+    #         full_script_url = urljoin(driver.current_url, script_url)
+    #         try:
+    #             response = requests.get(full_script_url)
+    #             if response.status_code == 200:
+    #                 script_content = response.text
+    #             else:
+    #                 print(f"Failed to fetch script: {full_script_url}, status code: {response.status_code}")
+    #                 continue
+    #         except requests.RequestException as e:
+    #             print(f"Error fetching script: {full_script_url}, error: {e}")
+    #             continue
+
+    #         url_hash = self.hash_content(full_script_url)
+    #         script_dir = os.path.join(OUTPUT_DIR, url_hash)
+    #         if not os.path.exists(script_dir):
+    #         # if content_hash not in self.hash_set:
+    #             load_js += 1
+    #             # self.hash_set.add(content_hash)
+    #             os.makedirs(script_dir)
+    #             self.save_file(os.path.join(script_dir, "code"), script_content)
+    #             # if self.is_tracker(script_url):
+    #             #     self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "1")
+    #             #     self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "1")
+    #             # else:
+    #             #     self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "0")
+    #             #     self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "0")
+    #             is_tracking, checked_filters = self.is_tracker(script_url)
+    #             label = "1" if is_tracking else "0"
+    #             self.save_file(os.path.join(script_dir, "label"), label)
+    #             # self.save_to_csv(
+    #             #     os.path.join(OUTPUT_DIR, "script_logs.csv"),
+    #             #     driver.current_url, full_script_url, content_hash,
+    #             #     trigger_sequence, label, checked_filters if is_tracking else []
+    #             # )
+    #             self.save_to_excel(
+    #                 os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
+    #                 self.url,
+    #                 trigger_sequence,
+    #                 full_script_url,
+    #                 url_hash,
+    #                 label,
+    #                 checked_filters if is_tracking else []
+    #             )
+    #     if load_js == 0:
+    #         self.save_to_excel(
+    #             os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
+    #             self.url,
+    #             trigger_sequence,
+    #             "None",  # JS가 로드되지 않았음을 표시
+    #             "N/A",
+    #             "-",
+    #             []
+    #         )
+    #     trigger_sequence[-1].n2.update_js_info(load_js)
     def extract_JS(self, edge):
         OUTPUT_DIR = "./js_output"
         driver = self.driver
@@ -925,74 +913,44 @@ class Crawler:
             current_edge = current_edge.parent
         trigger_sequence = trigger_sequence[::-1]  # 시퀀스를 올바른 순서로 정렬
 
-        # inline의 경우 labeling을 일단 pass한다.
+        # Inline JavaScript 수집
         inline_js = [tag.text for tag in soup.find_all('script') if tag.text.strip()]
         for script in inline_js:
-            content_hash = self.hash_content(script)
-            script_dir = os.path.join(OUTPUT_DIR, content_hash)
-            if not os.path.exists(script_dir):
-            # if content_hash not in self.hash_set:
-                load_js += 1
-                # self.hash_set.add(content_hash)
-                os.makedirs(script_dir) 
-                self.save_file(os.path.join(script_dir, "code"), script)
-                self.save_file(os.path.join(script_dir, "label"), "Inline")
-                # self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, f"url_{self.load_js}.js", content_hash, trigger_sequence, "0")
-                self.save_to_excel(
-                    os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
-                    self.url,
-                    trigger_sequence,
-                    f"url_{load_js}.js",
-                    content_hash,
-                    "Inline",
-                    []
-                )
+            self.save_script(script, "Inline", trigger_sequence, OUTPUT_DIR)
+            load_js += 1
 
+        # External JavaScript 수집 (DOM 기반)
         external_js_urls = [tag['src'] for tag in soup.find_all('script', src=True)]
         for script_url in external_js_urls:
             full_script_url = urljoin(driver.current_url, script_url)
             try:
                 response = requests.get(full_script_url)
                 if response.status_code == 200:
-                    script_content = response.text
+                    self.save_script(response.text, full_script_url, trigger_sequence, OUTPUT_DIR)
+                    load_js += 1
                 else:
                     print(f"Failed to fetch script: {full_script_url}, status code: {response.status_code}")
-                    continue
             except requests.RequestException as e:
                 print(f"Error fetching script: {full_script_url}, error: {e}")
-                continue
 
-            url_hash = self.hash_content(full_script_url)
-            script_dir = os.path.join(OUTPUT_DIR, url_hash)
-            if not os.path.exists(script_dir):
-            # if content_hash not in self.hash_set:
-                load_js += 1
-                # self.hash_set.add(content_hash)
-                os.makedirs(script_dir)
-                self.save_file(os.path.join(script_dir, "code"), script_content)
-                # if self.is_tracker(script_url):
-                #     self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "1")
-                #     self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "1")
-                # else:
-                #     self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "0")
-                #     self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "0")
-                is_tracking, checked_filters = self.is_tracker(script_url)
-                label = "1" if is_tracking else "0"
-                self.save_file(os.path.join(script_dir, "label"), label)
-                # self.save_to_csv(
-                #     os.path.join(OUTPUT_DIR, "script_logs.csv"),
-                #     driver.current_url, full_script_url, content_hash,
-                #     trigger_sequence, label, checked_filters if is_tracking else []
-                # )
-                self.save_to_excel(
-                    os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
-                    self.url,
-                    trigger_sequence,
-                    full_script_url,
-                    url_hash,
-                    label,
-                    checked_filters if is_tracking else []
-                )
+        # AdCPG 방식 추가: 네트워크 트래픽 기반 수집
+        script_entries = driver.execute_script("""
+            return performance.getEntriesByType('resource')
+                .filter(entry => entry.initiatorType === 'script')
+                .map(entry => entry.name);
+        """)
+        for script_url in script_entries:
+            try:
+                response = requests.get(script_url)
+                if response.status_code == 200:
+                    self.save_script(response.text, script_url, trigger_sequence, OUTPUT_DIR)
+                    load_js += 1
+                else:
+                    print(f"Failed to fetch script: {script_url}, status code: {response.status_code}")
+            except requests.RequestException as e:
+                print(f"Error fetching script: {script_url}, error: {e}")
+
+        # 로드된 JS가 없을 경우 기록
         if load_js == 0:
             self.save_to_excel(
                 os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
@@ -1004,6 +962,38 @@ class Crawler:
                 []
             )
         trigger_sequence[-1].n2.update_js_info(load_js)
+
+    # 공통 스크립트 저장 메서드
+    def save_script(self, content, url_or_label, trigger_sequence, output_dir):
+        if isinstance(url_or_label, str) and url_or_label == "Inline":
+            content_hash = self.hash_content(content)
+        else:
+            content_hash = self.hash_content(url_or_label)
+
+        script_dir = os.path.join(output_dir, content_hash)
+        if not os.path.exists(script_dir):
+            os.makedirs(script_dir)
+            self.save_file(os.path.join(script_dir, "code"), content)
+
+            # Labeling
+            if url_or_label == "Inline":
+                label = "Inline"
+                checked_filters = []
+            else:
+                is_tracking, checked_filters = self.is_tracker(url_or_label)
+                label = "1" if is_tracking else "0"
+
+            self.save_file(os.path.join(script_dir, "label"), label)
+            self.save_to_excel(
+                os.path.join(output_dir, "script_logs.xlsx"),
+                self.url,
+                trigger_sequence,
+                url_or_label if url_or_label != "Inline" else f"url_inline_{script_dir}",
+                content_hash,
+                label,
+                checked_filters
+            )
+
 
     # 4) Graph Representation
     def graph_visualizer(self):
