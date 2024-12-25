@@ -1,6 +1,7 @@
-from selenium import webdriver
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.common.action_chains import ActionChains
+# from selenium import webdriver
+from seleniumwire import webdriver
+# from selenium.webdriver.remote.webdriver import WebDriver
+# from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import (StaleElementReferenceException,
                                        TimeoutException,
                                        UnexpectedAlertPresentException,
@@ -9,6 +10,8 @@ from selenium.common.exceptions import (StaleElementReferenceException,
                                        WebDriverException,
                                        InvalidElementStateException
                                        )
+
+from seleniumwire.utils import decode
 
 from urllib.parse import urlparse, urljoin
 import json
@@ -487,19 +490,19 @@ class Crawler:
         self.debug_mode = debug_mode
         self.start_time = time.time()
 
-        # Path deconstruction
-        # TODO arg for this
-        if not debug_mode:
-            purl = urlparse(self.url)
-            if purl.path :
-                path_builder = ""
-                for d in purl.path.split("/")[:-1]:
-                    if d:
-                        path_builder += d + "/"
-                        tmp_purl = purl._replace(path=path_builder)
-                        req = Request(tmp_purl.geturl(), "get")
-                        self.graph.add(req)
-                        self.graph.connect(self.root_req, req, CrawlEdge("get", None, None) )
+        # # Path deconstruction
+        # # TODO arg for this
+        # if not debug_mode:
+        #     purl = urlparse(self.url)
+        #     if purl.path :
+        #         path_builder = ""
+        #         for d in purl.path.split("/")[:-1]:
+        #             if d:
+        #                 path_builder += d + "/"
+        #                 tmp_purl = purl._replace(path=path_builder)
+        #                 req = Request(tmp_purl.geturl(), "get")
+        #                 self.graph.add(req)
+        #                 self.graph.connect(self.root_req, req, CrawlEdge("get", None, None) )
 
         self.graph.data['urls'] = {}
         self.graph.data['form_urls'] = {}
@@ -611,41 +614,50 @@ class Crawler:
                     #print("Fake visit", e)
                     graph.visit_edge(e)
 
-        # Wait if needed
+        # # Wait if needed
+        # try:
+        #     wait_json = driver.execute_script("return JSON.stringify(need_to_wait)")
+        #     wait = json.loads(wait_json)
+        #     if wait:
+        #         time.sleep(1)
+        # except UnexpectedAlertPresentException:
+        #     logging.warning("Alert detected")
+        #     alert = driver.switch_to_alert()
+        #     alert.dismiss()
+
+        #     # Check if double check is needed...
+        #     try:
+        #         wait_json = driver.execute_script("return JSON.stringify(need_to_wait)")
+        #         wait = json.loads(wait_json)
+        #         if wait:
+        #             time.sleep(1)
+        #     except:
+        #         logging.warning("Inner wait error for need_to_wait")
+        # except:
+        #     logging.warning("No need_to_wait")
+
+        # # Timeouts
+        # try:
+        #     resps = driver.execute_script("return JSON.stringify(timeouts)")
+        #     todo = json.loads(resps)
+        #     for t in todo:
+        #         try:
+        #             if t['function_name']:
+        #                 driver.execute_script(t['function_name'] + "()")
+        #         except:
+        #             logging.warning("Could not execute javascript function in timeout " + str(t))
+        # except:
+        #     logging.warning("No timeouts from stringify")
+        
+        # If the edge is a "get" request, we can directly load the next page.
         try:
-            wait_json = driver.execute_script("return JSON.stringify(need_to_wait)")
-            wait = json.loads(wait_json)
-            if wait:
-                time.sleep(1)
-        except UnexpectedAlertPresentException:
-            logging.warning("Alert detected")
-            alert = driver.switch_to_alert()
-            alert.dismiss()
-
-            # Check if double check is needed...
-            try:
-                wait_json = driver.execute_script("return JSON.stringify(need_to_wait)")
-                wait = json.loads(wait_json)
-                if wait:
-                    time.sleep(1)
-            except:
-                logging.warning("Inner wait error for need_to_wait")
-        except:
-            logging.warning("No need_to_wait")
-
-        # Timeouts
-        try:
-            resps = driver.execute_script("return JSON.stringify(timeouts)")
-            todo = json.loads(resps)
-            for t in todo:
-                try:
-                    if t['function_name']:
-                        driver.execute_script(t['function_name'] + "()")
-                except:
-                    logging.warning("Could not execute javascript function in timeout " + str(t))
-        except:
-            logging.warning("No timeouts from stringify")
-
+            driver.set_page_load_timeout(60)
+            driver.get(request)
+            print(f"Loading page: {request}")
+        except Exception as e:
+            logging.warning(f"Failed to load page {request}: {str(e)}")
+            return True  # If we fail to load the page, skip to the next task
+        
         self.extract_JS(edge)
 
         print(f"Depth: {edge.depth}/{self.max_depth}")
@@ -806,103 +818,12 @@ class Crawler:
         with open(file_path, 'a', encoding='utf-8') as f:
             f.write(content)
 
-    # def extract_JS(self, edge):
-    #     OUTPUT_DIR = "./js_output"
-    #     driver = self.driver
-    #     soup = BeautifulSoup(driver.page_source, 'html.parser')
-    #     load_js = 0
-
-    #     # 시퀀스 생성: parent를 따라 올라가며 시퀀스 구성
-    #     trigger_sequence = []
-    #     current_edge = edge
-    #     while current_edge is not None:
-    #         trigger_sequence.append(current_edge)
-    #         current_edge = current_edge.parent
-    #     trigger_sequence = trigger_sequence[::-1]  # 시퀀스를 올바른 순서로 정렬
-
-    #     # inline의 경우 labeling을 일단 pass한다.
-    #     inline_js = [tag.text for tag in soup.find_all('script') if tag.text.strip()]
-    #     for script in inline_js:
-    #         content_hash = self.hash_content(script)
-    #         script_dir = os.path.join(OUTPUT_DIR, content_hash)
-    #         if not os.path.exists(script_dir):
-    #         # if content_hash not in self.hash_set:
-    #             load_js += 1
-    #             # self.hash_set.add(content_hash)
-    #             os.makedirs(script_dir) 
-    #             self.save_file(os.path.join(script_dir, "code"), script)
-    #             self.save_file(os.path.join(script_dir, "label"), "Inline")
-    #             # self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, f"url_{self.load_js}.js", content_hash, trigger_sequence, "0")
-    #             self.save_to_excel(
-    #                 os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
-    #                 self.url,
-    #                 trigger_sequence,
-    #                 f"url_{load_js}.js",
-    #                 content_hash,
-    #                 "Inline",
-    #                 []
-    #             )
-
-    #     external_js_urls = [tag['src'] for tag in soup.find_all('script', src=True)]
-    #     for script_url in external_js_urls:
-    #         full_script_url = urljoin(driver.current_url, script_url)
-    #         try:
-    #             response = requests.get(full_script_url)
-    #             if response.status_code == 200:
-    #                 script_content = response.text
-    #             else:
-    #                 print(f"Failed to fetch script: {full_script_url}, status code: {response.status_code}")
-    #                 continue
-    #         except requests.RequestException as e:
-    #             print(f"Error fetching script: {full_script_url}, error: {e}")
-    #             continue
-
-    #         url_hash = self.hash_content(full_script_url)
-    #         script_dir = os.path.join(OUTPUT_DIR, url_hash)
-    #         if not os.path.exists(script_dir):
-    #         # if content_hash not in self.hash_set:
-    #             load_js += 1
-    #             # self.hash_set.add(content_hash)
-    #             os.makedirs(script_dir)
-    #             self.save_file(os.path.join(script_dir, "code"), script_content)
-    #             # if self.is_tracker(script_url):
-    #             #     self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "1")
-    #             #     self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "1")
-    #             # else:
-    #             #     self.save_file(os.path.join(os.path.join(OUTPUT_DIR, content_hash), "label"), "0")
-    #             #     self.save_to_csv(os.path.join(OUTPUT_DIR, "script_logs.csv"), driver.current_url, full_script_url, content_hash, trigger_sequence, "0")
-    #             is_tracking, checked_filters = self.is_tracker(script_url)
-    #             label = "1" if is_tracking else "0"
-    #             self.save_file(os.path.join(script_dir, "label"), label)
-    #             # self.save_to_csv(
-    #             #     os.path.join(OUTPUT_DIR, "script_logs.csv"),
-    #             #     driver.current_url, full_script_url, content_hash,
-    #             #     trigger_sequence, label, checked_filters if is_tracking else []
-    #             # )
-    #             self.save_to_excel(
-    #                 os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
-    #                 self.url,
-    #                 trigger_sequence,
-    #                 full_script_url,
-    #                 url_hash,
-    #                 label,
-    #                 checked_filters if is_tracking else []
-    #             )
-    #     if load_js == 0:
-    #         self.save_to_excel(
-    #             os.path.join(OUTPUT_DIR, "script_logs.xlsx"),
-    #             self.url,
-    #             trigger_sequence,
-    #             "None",  # JS가 로드되지 않았음을 표시
-    #             "N/A",
-    #             "-",
-    #             []
-    #         )
-    #     trigger_sequence[-1].n2.update_js_info(load_js)
     def extract_JS(self, edge):
         OUTPUT_DIR = "./js_output"
         driver = self.driver
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        driver_requests = []
+        driver_requests = driver.requests
+        # soup = BeautifulSoup(driver.page_source, 'html.parser')
         load_js = 0
 
         # 시퀀스 생성: parent를 따라 올라가며 시퀀스 구성
@@ -913,42 +834,53 @@ class Crawler:
             current_edge = current_edge.parent
         trigger_sequence = trigger_sequence[::-1]  # 시퀀스를 올바른 순서로 정렬
 
-        # Inline JavaScript 수집
-        inline_js = [tag.text for tag in soup.find_all('script') if tag.text.strip()]
-        for script in inline_js:
-            self.save_script(script, "Inline", trigger_sequence, OUTPUT_DIR)
-            load_js += 1
+        # # Inline JavaScript 수집
+        # inline_js = [tag.text for tag in soup.find_all('script') if tag.text.strip()]
+        # for script in inline_js:
+        #     self.save_script(script, "Inline", trigger_sequence, OUTPUT_DIR)
+        #     load_js += 1
 
-        # External JavaScript 수집 (DOM 기반)
-        external_js_urls = [tag['src'] for tag in soup.find_all('script', src=True)]
-        for script_url in external_js_urls:
-            full_script_url = urljoin(driver.current_url, script_url)
-            try:
-                response = requests.get(full_script_url)
-                if response.status_code == 200:
-                    self.save_script(response.text, full_script_url, trigger_sequence, OUTPUT_DIR)
-                    load_js += 1
-                else:
-                    print(f"Failed to fetch script: {full_script_url}, status code: {response.status_code}")
-            except requests.RequestException as e:
-                print(f"Error fetching script: {full_script_url}, error: {e}")
+        # # External JavaScript 수집 (DOM 기반)
+        # external_js_urls = [tag['src'] for tag in soup.find_all('script', src=True)]
+        # for script_url in external_js_urls:
+        #     full_script_url = urljoin(driver.current_url, script_url)
+        #     try:
+        #         response = requests.get(full_script_url)
+        #         if response.status_code == 200:
+        #             self.save_script(response.text, full_script_url, trigger_sequence, OUTPUT_DIR)
+        #             load_js += 1
+        #         else:
+        #             print(f"Failed to fetch script: {full_script_url}, status code: {response.status_code}")
+        #     except requests.RequestException as e:
+        #         print(f"Error fetching script: {full_script_url}, error: {e}")
 
-        # AdCPG 방식 추가: 네트워크 트래픽 기반 수집
-        script_entries = driver.execute_script("""
-            return performance.getEntriesByType('resource')
-                .filter(entry => entry.initiatorType === 'script')
-                .map(entry => entry.name);
-        """)
-        for script_url in script_entries:
+        # # AdCPG 방식 추가: 네트워크 트래픽 기반 수집
+        # script_entries = driver.execute_script("""
+        #     return performance.getEntriesByType('resource')
+        #         .filter(entry => entry.initiatorType === 'script')
+        #         .map(entry => entry.name);
+        # """)
+        # for script_url in script_entries:
+        #     try:
+        #         response = requests.get(script_url)
+        #         if response.status_code == 200:
+        #             self.save_script(response.text, script_url, trigger_sequence, OUTPUT_DIR)
+        #             load_js += 1
+        #         else:
+        #             print(f"Failed to fetch script: {script_url}, status code: {response.status_code}")
+        #     except requests.RequestException as e:
+        #         print(f"Error fetching script: {script_url}, error: {e}")
+        for driver_request in driver_requests:
             try:
-                response = requests.get(script_url)
-                if response.status_code == 200:
-                    self.save_script(response.text, script_url, trigger_sequence, OUTPUT_DIR)
-                    load_js += 1
-                else:
-                    print(f"Failed to fetch script: {script_url}, status code: {response.status_code}")
-            except requests.RequestException as e:
-                print(f"Error fetching script: {script_url}, error: {e}")
+                if driver_request.url:
+                    response = driver_request.response
+                    if 'javascript' in str(response.headers.get('Content-Type', '')):
+                        # JavaScript 코드 추출
+                        code = decode(response.body, response.headers.get('Content-Encoding', 'identity')).decode('utf-8')
+                        self.save_script(code, driver_request.url, trigger_sequence, OUTPUT_DIR)
+                        load_js += 1
+            except Exception as e:
+                print(f"Error processing script for {driver_request.url}: {e}")
 
         # 로드된 JS가 없을 경우 기록
         if load_js == 0:
@@ -966,11 +898,14 @@ class Crawler:
     # 공통 스크립트 저장 메서드
     def save_script(self, content, url_or_label, trigger_sequence, output_dir):
         if isinstance(url_or_label, str) and url_or_label == "Inline":
-            content_hash = self.hash_content(content)
+            hash = self.hash_content(content)
         else:
-            content_hash = self.hash_content(url_or_label)
+            hash = self.hash_content(url_or_label)
 
-        script_dir = os.path.join(output_dir, content_hash)
+        filter_lists_path = os.path.join(output_dir, "filterlists")
+        self.get_filter_lists(filter_lists_path)
+
+        script_dir = os.path.join(output_dir, hash)
         if not os.path.exists(script_dir):
             os.makedirs(script_dir)
             self.save_file(os.path.join(script_dir, "code"), content)
@@ -989,7 +924,7 @@ class Crawler:
                 self.url,
                 trigger_sequence,
                 url_or_label if url_or_label != "Inline" else f"url_inline_{script_dir}",
-                content_hash,
+                hash,
                 label,
                 checked_filters
             )
