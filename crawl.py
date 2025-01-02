@@ -1,7 +1,6 @@
-# from selenium import webdriver
-from seleniumwire import webdriver 
-# from selenium.webdriver.remote.webdriver import WebDriver
-# from selenium.webdriver.common.action_chains import ActionChains
+from selenium import webdriver
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.common.action_chains import ActionChains
 import json
 import pprint
 import argparse
@@ -28,7 +27,7 @@ chrome_options.add_argument("--disable-web-security")
 chrome_options.add_argument("--disable-xss-auditor")
 
 # launch Chrome
-driver = webdriver.Chrome(options=chrome_options)
+driver = webdriver.Chrome(options = chrome_options)
 #driver.set_window_position(-1700,0)
 
 # Read scripts and add script which will be executed when the page starts loading
@@ -58,7 +57,6 @@ else:
             Crawler(driver, url, args.t).start(args.debug)
     except FileNotFoundError:
         print("Please use --url or --q")
-
 
 
 

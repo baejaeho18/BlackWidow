@@ -31,29 +31,21 @@ from extractors.Iframes import extract_iframes
 
 # From: https://stackoverflow.com/a/47298910
 def send(driver, cmd, params={}):
-#   resource = "/session/%s/chromium/send_command_and_get_result" % driver.session_id
-#   url = driver.command_executor._url + resource
-#   body = json.dumps({'cmd': cmd, 'params': params})
-#   response = driver.command_executor._request('POST', url, body)
-#   if "status" in response:
-#     logging.error(response)
-    try:
-        # "send_command_and_get_result" 명령을 직접 호출
-        response = driver.execute(
-            'SEND_COMMAND', 
-            {
-                'cmd': cmd,
-                'params': params
-            }
-        )
-        # 에러가 있는지 확인
-        if 'status' in response and response['status'] != 0:
-            logging.error("Error sending command: %s", response)
-    except Exception as e:
-        logging.error("Exception during sending command: %s", str(e))
-        
+  resource = "/session/%s/chromium/send_command_and_get_result" % driver.session_id
+  url = driver.command_executor._url + resource
+  body = json.dumps({'cmd': cmd, 'params': params})
+  response = driver.command_executor._request('POST', url, body)
+  if "status" in response:
+    logging.error(response)
+
 def add_script(driver, script):
-   send(driver, "Page.addScriptToEvaluateOnNewDocument", {"source": script})
+    send(driver, "Page.addScriptToEvaluateOnNewDocument", {"source": script})
+    # try:
+    #     # Selenium 4.x CDP 방식 사용
+    #     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
+    #     # print("Script added successfully!")
+    # except Exception as e:
+    #     print(f"Failed to add script: {e}")
 
 # Changes the address from the row to the first cell
 # Only modifies if it is a table row
@@ -76,6 +68,8 @@ def remove_alerts(driver):
         alert.dismiss()
     except NoAlertPresentException:
         pass
+
+
 
 def depth(edge):
     depth = 1
