@@ -1,0 +1,1 @@
+jQuery(document).ready((function(){jQuery(".vscom-collage-item").addClass("on")}));

@@ -1,0 +1,35 @@
+(function($) {
+    $(document).ready(function() {
+        $('#usbl-integrated-button').on('click', function(e) {
+            function createStateObserver() {
+                const targetNode = document.getElementsByTagName('body').item(0);
+                const config = { attributes: false, childList: true, subtree: false };
+                var modalHasOpened = false;
+
+                const callback = function(mutationsList, observer) {
+                    // Use traditional 'for loops' for IE 11
+                    for (const mutation of mutationsList) {
+                        if (mutation.type === 'childList') {
+                            var usabilla = document.getElementsByClassName('usabilla_scroller_area');
+                            if (modalHasOpened) {
+                                if (usabilla.length === 0) {
+                                    $('#usbl-integrated-button').focus();
+                                    observer.disconnect();
+                                }
+                            } else {
+                                if (usabilla.length > 0) {
+                                    modalHasOpened = true;
+                                }
+                            }
+                        }
+                    }
+                };
+                const observer = new MutationObserver(callback);
+
+                observer.observe(targetNode, config);
+            }
+
+            createStateObserver();
+        });
+    });
+})(jQuery);

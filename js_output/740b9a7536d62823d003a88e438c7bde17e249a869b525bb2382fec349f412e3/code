@@ -1,0 +1,1 @@
+jQuery(document).on("ready",(function(){var $elems=jQuery(".vscom-icon-cloud .vscom-icon-cloud-icon");for(i=0;i<$elems.length;i+=3)$set=$elems.slice(i,i+3),$set.add($set.nextUntil(".vscom-icon-cloud-icon")).wrapAll('<div class="vs-logos-list"/>')}));

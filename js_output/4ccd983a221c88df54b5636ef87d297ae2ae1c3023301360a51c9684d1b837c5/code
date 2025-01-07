@@ -1,0 +1,2 @@
+// For license information, see `https://assets.adobedtm.com/5ef092d1efb5/2537c33769cb/12d5b406d0fe/RCf92c7ac2ddfe449ba44c4765093722d9-source.js`.
+_satellite.__registerScript('https://assets.adobedtm.com/5ef092d1efb5/2537c33769cb/12d5b406d0fe/RCf92c7ac2ddfe449ba44c4765093722d9-source.min.js', "var ruleCorrelationGuid=\"KIF-034b2e50-4e86-47a3-814a-25d7467df6ef\";console.log(ruleCorrelationGuid+\": Launcher Rule Fired\");");

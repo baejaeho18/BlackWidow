@@ -1,1 +1,0 @@
-window._hst=Date.now();

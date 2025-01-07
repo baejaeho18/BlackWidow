@@ -25,7 +25,7 @@ WebDriver.add_script = add_script
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument("--disable-web-security")
 chrome_options.add_argument("--disable-xss-auditor")
-
+chrome_options.add_argument("--headless")
 # launch Chrome
 driver = webdriver.Chrome(options = chrome_options)
 #driver.set_window_position(-1700,0)
