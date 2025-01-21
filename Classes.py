@@ -50,7 +50,7 @@ for v in logging.Logger.manager.loggerDict.values():
 
 
 class Crawler:
-    def __init__(self, driver, url, timeout=900):
+    def __init__(self, driver, url, timeout=900, output="script_logs.xlsx"):
         self.driver = driver
         # Start url
         self.url = url
@@ -69,6 +69,8 @@ class Crawler:
 
         self.timeout = timeout
         self.start_time = None
+        
+        self.output_file = output
 
     def start(self, debug_mode=True):
         self.root_req = Request("ROOTREQ", "get")
@@ -482,7 +484,7 @@ class Crawler:
             return 1
         
         self.save_to_excel(
-                os.path.join(output_dir, "script_logs.xlsx"),
+                os.path.join(output_dir, self.output_file),
                 self.url,
                 trigger_sequence,
                 url_or_label if url_or_label != "Inline" else f"url_inline_{script_dir}",
